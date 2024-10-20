@@ -14,7 +14,6 @@ LF::~LF() {
 }
 
 void LF::addTask(function<void()> task) {
-    // cout << "Adding task to the LF queue\n" << endl;
     {
         lock_guard<mutex> lock(queueMutex);  // Lock the mutex
         taskQueue.push(task);  // Add the task to the queue
