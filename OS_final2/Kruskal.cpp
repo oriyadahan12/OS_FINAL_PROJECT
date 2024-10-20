@@ -21,12 +21,12 @@
                 uf.Union(e.getStart().getId(), e.getEnd().getId());
             }
         }
-        std::vector<std::vector<size_t>> dist, per;
+        std::vector<std::vector<size_t>> dist, parent;
         // Get the distance and parent matrices of the MST
-        std::tie(dist, per) = mst->floydWarshall();
+        std::tie(dist, parent) = mst->floydWarshall();
         //update distance and parent matrices in mst
         mst->setDistances(dist);
-        mst->setParent(per);
+        mst->setParent(parent);
         return mst;
     }
 
@@ -39,10 +39,10 @@
         rank(n), 
         parent(n){ 
 
-        makeSet(); } 
+        create_set(); } 
   
     // Creates n single item sets 
-    void UnionFind::makeSet() { 
+    void UnionFind::create_set() { 
         for (size_t i = 0; i < n; i++) { 
             parent[i] = i; 
         } 
@@ -67,9 +67,7 @@
      } 
     } 
   
-    /* 
-      Do union of two sets by rank represented by x and y. 
-    */
+    // Do union of two sets by rank represented by x and y. 
     void UnionFind::Union(size_t x, size_t y) { 
         // Find current sets of x and y 
         size_t xp = find(x); 

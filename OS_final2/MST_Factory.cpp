@@ -22,7 +22,6 @@ MST_Factory *MST_Factory::getInstance() {
     // Check if instance is not already created
     if (instance == nullptr) {
         instance = new MST_Factory();  // Create the instance
-
         // Initialize the strategies
         strats["prim"] = new Prim{};
         strats["kruskal"] = new Kruskal{};
@@ -42,7 +41,7 @@ MST_Strategy* MST_Factory::createMST(std::string algo) {
         return strats[algo];  // Return the corresponding strategy
     }
     // Throw an exception if the strategy type is invalid
-    throw std::invalid_argument("Invalid MST Strategy");
+    throw std::invalid_argument("Invalid MST Strategy input");
 }
 
 // Cleanup method to delete allocated strategies and the instance
