@@ -12,6 +12,14 @@
 using namespace std;
 
 class LF {
+    public:
+        LF(int num_threads);
+        ~LF();
+        void addTask(function<void()> task);  // Add a task to the queue
+        void start();
+        void stop();
+
+        
     private:
         void worker(int id);  // Worker function
         vector<thread> threads;  // Vector to store threads
@@ -19,15 +27,10 @@ class LF {
         queue<function<void()>> taskQueue;  // Queue to store tasks
         mutex queueMutex;  // Mutex to protect the tasks queue
         mutex stopMutex;  // Mutex to protect the stop flag
-        condition_variable condition;  // used to notify the threads that there is a task in the queue
+        condition_variable c;  // used to notify the threads that there is a task in the queue
         bool stopFlag;  // Flag to stop the threads if set to true
         int leader;  // Leader thread
-    public:
-        LF(int num_threads);
-        ~LF();
-        void addTask(function<void()> task);  // Add a task to the queue
-        void start();
-        void stop();
+    
 };
 
 #endif // LFP_HPP

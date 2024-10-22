@@ -16,7 +16,7 @@
 extern LF lf; // Leader-Follower pattern instance
 
 // Handle client input and perform acts based on the received command
-std::pair<std::string, Graph *> handleInput(Graph *g, std::string act, int fd_client, std::string currentAct, int n, int m, int w, std::string algo){
+std::pair<std::string, Graph *> handleInput(Graph *g, std::string act, int fd_client, std::string current_act, int n, int m, int w, std::string algo){
     std::string msg;
     std::vector<std::string> command = split_spaces(act);
     if (command.size() < 1){
@@ -24,10 +24,10 @@ std::pair<std::string, Graph *> handleInput(Graph *g, std::string act, int fd_cl
         return {msg, nullptr}; // Handle empty message
     }
 
-    if (currentAct == "newgraph"){ 
+    if (current_act == "newgraph"){ 
         return newGraph(n, m, fd_client, g); // Create a new graph
     }
-    else if (currentAct == "newedge"){
+    else if (current_act == "newedge"){
         if (g != nullptr){
             return newEdge(static_cast<size_t>(n), static_cast<size_t>(m), static_cast<size_t>(w), fd_client, g); // Add an edge
         }
@@ -35,7 +35,7 @@ std::pair<std::string, Graph *> handleInput(Graph *g, std::string act, int fd_cl
               return {msg, nullptr}; // Handle case where graph doesn't exist
         }
     }
-    else if (currentAct == "removeedge"){
+    else if (current_act == "removeedge"){
         if (g != nullptr){
             return removeedge(n, m, fd_client, g); // Remove an edge
         }
@@ -43,7 +43,7 @@ std::pair<std::string, Graph *> handleInput(Graph *g, std::string act, int fd_cl
               return {msg, nullptr}; // Handle case where graph doesn't exist
         }
     }
-    else if (currentAct == "mst"){ 
+    else if (current_act == "mst"){ 
         if (g == nullptr){
             msg = "There is no graph\n";
             return {msg, nullptr}; // Handle case where graph doesn't exist
@@ -129,27 +129,27 @@ void del_from_pfds(struct pollfd pfds[], int i, int *count){
 }
 
 // Parse input from the client
-void parseInput(char *buf, int numOfBytes, int &n, int &m, int &weight, std::string &strat, std::string &act, std::string &currentAct, const std::vector<std::string> &graphacts, const std::vector<std::string> &mst_starts){
+void parseInput(char *buf, int numOfBytes, int &n, int &m, int &weight, std::string &strat, std::string &act, std::string &current_act, const std::vector<std::string> &commands_graph, const std::vector<std::string> &mst_starts){
     buf[numOfBytes] = '\0'; // Null-terminate the buffer
     act = lower_case(std::string(buf)); // Convert input to lowercase
     std::vector<std::string> command = split_spaces(act); // Split input into command
     if (command.size() > 0){
-        currentAct = command[0]; // Get the first token as the act
-        cout << "act received: " << currentAct << " command size: " << command.size() << endl;
+        current_act = command[0]; // Get the first token as the act
+        cout << "act received: " << current_act << " command size: " << command.size() << endl;
     }
-    else{ currentAct = "There is no message"; // Handle empty input
+    else{ current_act = "There is no message"; // Handle empty input
     }
     // Check if the act is a valid graph act
-    if (find(graphacts.begin(), graphacts.end(), currentAct) == graphacts.end()){
-        currentAct = "message"; // Invalid act
+    if (find(commands_graph.begin(), commands_graph.end(), current_act) == commands_graph.end()){
+        current_act = "message"; // Invalid act
     }
-    else if (currentAct == "mst"){ // Check for MST act
+    else if (current_act == "mst"){ // Check for MST act
         if (command.size() > 1){
             if (find(mst_starts.begin(), mst_starts.end(), command[1]) == mst_starts.end()){
-                currentAct = "message"; // Invalid strategy
+                current_act = "message"; // Invalid strategy
             }
             else{
-                currentAct = "mst"; // Valid MST act
+                current_act = "mst"; // Valid MST act
                 act = command[0];
                 n = -1;
                 m = -1;
@@ -158,16 +158,16 @@ void parseInput(char *buf, int numOfBytes, int &n, int &m, int &weight, std::str
             }
         }
         else {
-            currentAct = "message"; // No strategy provided
+            current_act = "message"; // No strategy provided
         }
     }
     else if (!string_is_num(command)){ // Check if command are numbers
-        currentAct = "message"; // Not valid numbers
+        current_act = "message"; // Not valid numbers
         cout << "Not a number" << endl;
     }
-    else if (currentAct == "newgraph"){ // Handle new graph creation
+    else if (current_act == "newgraph"){ // Handle new graph creation
         if (command.size() != 3){ // Check token count
-            currentAct = "message"; // Invalid command
+            current_act = "message"; // Invalid command
         }
         else{
             n = stoi(command[1]); // Get number of vertices
@@ -175,9 +175,9 @@ void parseInput(char *buf, int numOfBytes, int &n, int &m, int &weight, std::str
             weight = -1; 
         }
     }
-    else if (currentAct == "newedge"){ // Handle new edge creation
+    else if (current_act == "newedge"){ // Handle new edge creation
         if (command.size() != 4){ // Check token count
-            currentAct = "message"; // Invalid command
+            current_act = "message"; // Invalid command
         }
         else{
             n = stoi(command[1]); // Get starting vertex
@@ -185,9 +185,9 @@ void parseInput(char *buf, int numOfBytes, int &n, int &m, int &weight, std::str
             weight = stoi(command[3]); // Get edge weight
         }
     }
-    else if (currentAct == "removeedge"){ // Handle edge removal
+    else if (current_act == "removeedge"){ // Handle edge removal
         if (command.size() != 3){
-            currentAct = "message"; // Invalid command
+            current_act = "message"; // Invalid command
         }
         else{
             n = stoi(command[1]); // Get starting vertex
