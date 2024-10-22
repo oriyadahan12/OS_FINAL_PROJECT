@@ -1,4 +1,4 @@
-#include "vertex.cpp"
+#include "edge.hpp"
 
 // Constructor to create a weighted edge
 Edge::Edge(Vertex s, Vertex e, size_t w) : start(s), end(e), weight(w) {}
