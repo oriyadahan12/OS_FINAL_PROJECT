@@ -1,34 +1,36 @@
 #include "PAO.hpp"
 
 /**
- * Construct a new PAO object.
- * Get the functions to be executed by the workers.
+ * Constructor: Initializes a PAO object.
+ * Takes a list of functions to be executed by the worker threads.
  */
-PAO::PAO(const std::vector<std::function<void(void*)>>& functions): stopFlag(false) {
-    // filling the workers vector with the struct Worker:
+PAO::PAO(const std::vector<std::function<void(void*)>>& functions) : stopFlag(false) {
+    // Populate the workers vector with Worker structs
     for (const auto& func : functions) {
-        // std::thread* trd = new std::thread();  // creating a new thread
-        std::mutex* mtx = new std::mutex();  // creating a new mutex
-        std::condition_variable* cond = new std::condition_variable();  // creating a new condition variable
-        workers.push_back({nullptr, func, std::queue<void*>(), mtx, cond, nullptr});
+        // Creating a mutex and condition variable for each worker
+        std::mutex* taskQueueMutex = new std::mutex();
+        std::condition_variable* taskCondition = new std::condition_variable();
+        // Add a new worker to the vector with the given function, empty task queue, mutex, and condition variable
+        workers.push_back({nullptr, func, std::queue<void*>(), taskQueueMutex, taskCondition, nullptr});
     }
-    // Set the nextTaskQueue pointer for each worker except the last one:
+    // Set the nextTaskQueue pointer for each worker, except the last one, to point to the next worker's task queue
     for (size_t i = 0; i < workers.size() - 1; ++i) {
         workers[i].nextTaskQueue = &workers[i + 1].taskQueue;
     }
 }
 
+/**
+ * Destructor: Cleans up resources by stopping the worker threads and freeing memory.
+ */
 PAO::~PAO() {
+    stop();  // Stop all worker threads
 
-    stop();  // stop the threads
-
-    // going over all the workers and deleting the threads, mutexes and condition variables
+    // Iterate over all workers and free associated resources (threads, mutexes, condition variables)
     for (auto& worker : workers) {
-        // if the thread is joinable, join it (:= wait for it to finish)
         if (worker.thread && worker.thread->joinable()) {
-            worker.thread->join();
+            worker.thread->join();  // Ensure the thread has finished executing
         }
-
+        // Free allocated memory for the thread, mutex, and condition variable
         delete worker.thread;
         delete worker.queueMutex;
         delete worker.condition;
@@ -36,69 +38,74 @@ PAO::~PAO() {
 }
 
 /**
- * in this function, the object will give the first thread the mst and the string and it will start working on it.
+ * Add a new task to the first worker's task queue.
+ * This method locks the queue and notifies the first worker to start processing.
  */
-void PAO::addTask(void* task) {
-    
+void PAO::addTask(void* newTask) {
     std::lock_guard<std::mutex> lock(*(workers[0].queueMutex));
-    workers[0].taskQueue.push(task);
-    workers[0].condition->notify_one();  // notify the first worker to start working
+    workers[0].taskQueue.push(newTask);
+    workers[0].condition->notify_one();  // Notify the first worker to start working on the new task
 }
 
 /**
- * this function will start all the threads.
- * it will iterate over all the workers and start the thread with the workerFunction.
+ * Start all worker threads.
+ * Iterates over all workers and creates threads for each, passing the workerFunction.
  */
 void PAO::start() {
-    stopFlag = false;
-    
+    stopFlag = false;  // Reset the stop flag
+
+    // Iterate over all workers and start a thread for each one
     for (size_t i = 0; i < workers.size(); ++i) {
-        Worker* nextWorker = (i + 1 < workers.size()) ? &workers[i + 1] : nullptr;  // if the worker is not the last one, set the nextWorker to the next worker
+        Worker* nextWorker = (i + 1 < workers.size()) ? &workers[i + 1] : nullptr;  // If it's not the last worker, set the next worker
         workers[i].thread = new std::thread(&PAO::workerFunction, this, std::ref(workers[i]), nextWorker);
     }
 }
 
+/**
+ * Stop all worker threads.
+ * Sets the stop flag to true and notifies all workers to stop processing.
+ */
 void PAO::stop() {
-    stopFlag = true;
-    for (auto& worker : workers) {  // notify all the workers to stop
+    stopFlag = true;  // Signal the stop condition to all workers
+
+    // Notify all workers to stop by unlocking their mutex and signaling their condition variables
+    for (auto& worker : workers) {
         std::lock_guard<std::mutex> lock(*worker.queueMutex);
-        worker.condition->notify_all();
-        // if (worker.thread->joinable()) {
-        //     worker.thread->join();
-        // }
+        worker.condition->notify_all();  // Notify all workers to exit
     }
 }
 
 /**
- * this function actually wrap the function that the worker will execute so it will not end until the stopFlag is true.
+ * The worker function that continuously processes tasks until the stop flag is set.
+ * Executes the assigned function on each task and forwards tasks to the next worker.
  */
-void PAO::workerFunction(Worker& worker, Worker* nextWorker) {
+void PAO::workerFunction(Worker& currentWorker, Worker* nextWorker) {
     while (!stopFlag) {
-
-        // creating a task:
+        // Task processing:
         void* task = nullptr;
         {
-            std::unique_lock<std::mutex> lock(*worker.queueMutex);
-            // Note that in the wait function, the queueMutex is unlocked and locked again when the condition is met.
-            worker.condition->wait(lock, [&]() { return stopFlag || !worker.taskQueue.empty(); });  // while the taskQueue is empty and the stopFlag is false, wait
+            std::unique_lock<std::mutex> lock(*currentWorker.queueMutex);
+            // Wait until there's a task or the stop flag is set
+            currentWorker.condition->wait(lock, [&]() { return stopFlag || !currentWorker.taskQueue.empty(); });
 
-            if (stopFlag && worker.taskQueue.empty()) return;
-            task = worker.taskQueue.front();
-            worker.taskQueue.pop();
+            if (stopFlag && currentWorker.taskQueue.empty()) return;  // Exit if stop flag is set and no tasks remain
+
+            task = currentWorker.taskQueue.front();  // Get the task from the queue
+            currentWorker.taskQueue.pop();  // Remove the task from the queue
         }
 
-        // if the worker has a function to execute:
-        if (worker.function) {
-            worker.function(task);  // operate the function with the task
+        // Execute the worker's function with the task, if available
+        if (currentWorker.function) {
+            currentWorker.function(task);
         }
 
-        // if the worker is not the last one
-        if (nextWorker) {  
-            // pushing the task to the next worker:
+        // If there is a next worker, forward the task to their queue
+        if (nextWorker) {
             std::lock_guard<std::mutex> lock(*nextWorker->queueMutex);
-            nextWorker->taskQueue.push(task);  // actually pushes a reserence to the mst and the string
-            nextWorker->condition->notify_one();  // notify the next worker to start working
+            nextWorker->taskQueue.push(task);  // Forward the task to the next worker
+            nextWorker->condition->notify_one();  // Notify the next worker to start working
         }
-        if(stopFlag) return;
+
+        if (stopFlag) return;  // Check if stop flag was set mid-processing
     }
 }
