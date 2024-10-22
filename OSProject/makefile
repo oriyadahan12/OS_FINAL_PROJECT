@@ -15,7 +15,7 @@ DATASTRUCTSrc = $(wildcard DataStruct/*.cpp) DataStruct/BinaryHeap.hpp
 UTILSrc = $(wildcard ServerUtils/*.cpp)
 
 
-lf-serverSrc = LF-Server.cpp LFP/LFP.cpp 
+lf-serverSrc = LF-Server.cpp LFP/LeaderFollower.cpp 
 PAO = PAO-server.cpp PAO/PAO.cpp
 
 
