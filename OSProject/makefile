@@ -11,7 +11,7 @@ COVERAGE_FLAGS = --coverage
 # Source files
 graphSrc = $(wildcard GraphObj/*.cpp)
 MSTSrc = $(wildcard MST/*.cpp)
-DATASTRUCTSrc = $(wildcard DataStruct/*.cpp) DataStruct/BinaryHeap.hpp
+DATASTRUCTSrc = $(wildcard DataStruct/*.cpp) DataStruct/struct.hpp
 UTILSrc = $(wildcard ServerUtils/*.cpp)
 
 
