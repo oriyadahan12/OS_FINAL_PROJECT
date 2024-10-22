@@ -3,8 +3,7 @@
 
 
 // Comparator for priority queue (min-heap), compares based on the key values of vertices
-struct CompareVertex
-{
+struct CompareVertex{
     bool operator()(std::pair<size_t, int> const &value_1, std::pair<size_t, int> const &value_2){
         return value_1.second < value_2.second; // Min-heap based on key values (second element of the pair)
     }
