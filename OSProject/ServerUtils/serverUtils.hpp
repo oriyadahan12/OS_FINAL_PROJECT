@@ -84,11 +84,11 @@
 extern std::pair<std::string, Graph *> MST(Graph *g, int clientFd, const std::string &strat);
 
 // Function to convert a string to lowercase
-std::string toLowerCase(std::string s);
+std::string lower_case(std::string s);
 
 void initGraph(Graph *g, int m, int clientFd);
 
-std::vector<std::string> splitStringBySpaces(const std::string &input);
+std::vector<std::string> split_spaces(const std::string &input);
 
 void parseInput(char *buf, int nbytes, int &n, int &m, int &weight, std::string &strat, std::string &action, std::string &actualAction, const std::vector<std::string> &graphActions, const std::vector<std::string> &mstStrats);
 
