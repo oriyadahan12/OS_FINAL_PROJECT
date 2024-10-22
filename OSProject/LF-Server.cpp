@@ -19,7 +19,7 @@
 #include "GraphObj/graph.hpp"
 #include "MST/MST_Strategy.hpp"
 #include "MST/MST_Factory.hpp"
-#include "LFP/LFP.hpp"
+#include "LFP/LeaderFollower.hpp"
 #include "ServerUtils/serverUtils.hpp"
 
 // to handle the CTRL+C signal
