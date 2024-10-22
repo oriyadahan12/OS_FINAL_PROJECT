@@ -1,6 +1,8 @@
 #include "MST_Factory.hpp"
-#include "Prim.hpp"
-#include "Kruskal.hpp"
+//#include "Prim.hpp"
+//#include "Kruskal.hpp"
+
+#include "Algo.hpp"
 
 
 MST_Factory *MST_Factory::instance = nullptr;
