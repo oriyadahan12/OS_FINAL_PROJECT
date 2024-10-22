@@ -78,7 +78,7 @@
 #include "../MST/MST_Factory.hpp"
 #include <string.h>
 #define PORT "9036" // Port we're listening on
-#include "../LFP/LFP.hpp"
+#include "../LFP/LeaderFollower.hpp"
 
 // Declare the MST function as extern
 extern std::pair<std::string, Graph *> MST(Graph *g, int clientFd, const std::string &strat);
