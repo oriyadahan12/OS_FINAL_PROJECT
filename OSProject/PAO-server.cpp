@@ -16,71 +16,83 @@
 #include "MST/MST_Strategy.hpp"
 #include "MST/MST_Factory.hpp"
 #include "ServerUtils/serverUtils.hpp"
-#include "PAO/PAO.hpp"
+#include "PAO/pipelineActiveObject.hpp"
 #include <memory>
 #include <mutex>
-
-// to handle the CTRL+C signal
 #include <signal.h>
 
-#define PORT "9036"   // Port we're listening on
-#define WELCOME_MSG_SIZE 480
+#define PORT "9036"   // Port number where the server listens for connections
+#define WELCOME_MSG_SIZE 480  // Size of the welcome message buffer
 
 using namespace std;
 
 /**
  * Struct to store the graph and the message to be sent to the client.
- * This will be used by the PAO object to execute the functions.
+ * This structure is used in the PAO (Parallel Asynchronous Object) to 
+ * execute various graph-related functions asynchronously.
  */
 struct Triple{
-    Graph* g;
-    string msg;
-    int clientFd;
+    Graph* g;          // Pointer to the client's graph
+    string msg;        // Message to be sent to the client
+    int clientFd;      // File descriptor representing the client connection
 };
 
-// global variable:
-map<int, pair<Graph*, Triple*>> clients_graphs;  // dictionary to store the client file descriptor and its graph
-map<int, mutex> clients_mtx;  // dictionary to store the client file descriptor and its mutex
-struct pollfd* pfds;  // set of file descriptors (global to maintain correct memory management when interrupting the server)
-int fd_count = 0;
-PAO* pao = nullptr;
-mutex mtx;
+// Global variables:
+int fd_count = 0;     // Counter for number of file descriptors (clients)
+PAO* pao = nullptr;   // Pointer to the PAO object managing tasks
+mutex mtx;            // Mutex for global synchronization
+map<int, pair<Graph*, Triple*>> clients_graphs;  // Maps client file descriptors to their graphs and associated Triple objects
+map<int, mutex> clients_mtx;  // Maps client file descriptors to their corresponding mutex for thread safety
+struct pollfd* pfds;  // Set of poll file descriptors, dynamically managed during client connections
+
 
 /**
- * Function to handle MST request.
- * creates a new triple on the heap and adds it to the PAO object as a task.
+ * Handles an MST request from a client. This function creates a new Triple object
+ * for each request, assigns the task to the PAO, and processes the MST calculation.
+ *
+ * @param g The graph object pointer
+ * @param clientFd The file descriptor for the client
+ * @param strat The MST algorithm strategy ("prim", "kruskal", etc.)
+ * @return A pair consisting of the result message and the MST graph pointer
  */
 std::pair<std::string, Graph *> MST(Graph *g, int clientFd, const std::string& strat)
 {
     Graph* tmp = nullptr;
     Triple* t = nullptr;
     {
-        unique_lock<mutex> lock(clients_mtx[clientFd]);
-        if(clients_graphs[clientFd].second != nullptr) {  // if the triple is not null, delete it
-        if (clients_graphs[clientFd].second->g != nullptr)
-        {
-            delete clients_graphs[clientFd].second->g;
-            clients_graphs[clientFd].second->g = nullptr;
-        }
-        delete clients_graphs[clientFd].second;
-    }
-    
-    clients_graphs[clientFd].second = new Triple{g, strat, clientFd};  // creating a new triple on the heap := {&g, strat, clientFd}. it will be deleted in the last function
+        unique_lock<mutex> lock(clients_mtx[clientFd]);  // Lock the mutex for thread safety
 
-    t = clients_graphs[clientFd].second;  // get the triple
-    MST_Strategy* MST_strategy = MST_Factory::getInstance()->createMST(t->msg);  // create the MST strategy
-     tmp = (*MST_strategy)(t->g);                                         // create the MST using the strategy
+        // Clean up any existing Triple or graph for the client
+        if (clients_graphs[clientFd].second != nullptr) {  
+            if (clients_graphs[clientFd].second->g != nullptr) {
+                delete clients_graphs[clientFd].second->g;  // Delete the old graph
+                clients_graphs[clientFd].second->g = nullptr;
+            }
+            delete clients_graphs[clientFd].second;  // Delete the old Triple
+        }
+
+        // Create a new Triple object and store it in the client's record
+        clients_graphs[clientFd].second = new Triple{g, strat, clientFd};  
+        t = clients_graphs[clientFd].second;  // Assign the new Triple
+
+        // Select the MST algorithm strategy (e.g., Prim, Kruskal)
+        MST_Strategy* MST_strategy = MST_Factory::getInstance()->createMST(t->msg);  
+        tmp = (*MST_strategy)(t->g);  // Generate the MST based on the selected strategy
     }
-    t->g =  tmp;                                                        // create the MST using the strategy and store it in temp
+
+    // Update the Triple with the new MST graph and a success message
+    t->g = tmp;  
     t->msg = "MST created using " + t->msg + " strategy\n";
 
-    pao->addTask(clients_graphs[clientFd].second);  // add the triple to the PAO object (means the first function will execute its function on this triple)
+    // Add the task to the PAO for further processing (like calculating metrics)
+    pao->addTask(clients_graphs[clientFd].second);  
     std::cout << "User " << clientFd << " requested to find MST of the Graph" << std::endl;
-    return {"", nullptr};
-}
 
+    return {"", nullptr};  // Return empty result since the processing will be done asynchronously
+}
 /**
- * Handle the signal, actually stopping the server's while loop
+ * Signal handler for SIGINT (Ctrl+C). Cleans up resources and safely shuts down
+ * the server by releasing allocated memory and closing client connections.
  */
 void handleSig(int sig) {
     {
@@ -127,7 +139,11 @@ void handleSig(int sig) {
 }
 
  
-// Main
+/**
+ * Main function of the server. Sets up the listener socket, manages client connections,
+ * and handles incoming messages to perform graph-related actions (create graph, add/remove edge, MST).
+ */
+
 int main(void) {   
 
     // Create a list of functions to be executed by the PAO
@@ -198,7 +214,8 @@ int main(void) {
     // Set up and get a listening socket
     int listener = getListenerSocket();
     if (listener == -1){
-        fprintf(stderr, "error getting listening socket\n");
+        std::cerr << "Error getting listening socket on port " << PORT 
+              << ": " << strerror(errno) << "\n";
         exit(1);
     }
 
@@ -208,7 +225,7 @@ int main(void) {
     pfds[0].fd = listener;
     pfds[0].events = POLLIN; // Report ready to read on incoming connection
     fd_count = 1; // For the listener
-    cout << "PAO-server: waiting for connections..." << endl;
+    cout << "waiting for connections..." << endl;
 
     signal(SIGINT, handleSig);  // handle the CTRL+C signal
 
@@ -309,10 +326,10 @@ int main(void) {
                         }
                     }
                 }
-            } // END handle data from client
-        } // END got ready-to-read from poll()
-    } // END looping through file descriptors
-    // END for(;;)--and you thought it would never end!
+            } 
+        } 
+    } 
+   
 
     return 0;
 }
