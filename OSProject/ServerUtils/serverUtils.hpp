@@ -77,7 +77,7 @@
 #include <poll.h>       // Include this header for pollfd
 #include "../MST/MST_Factory.hpp"
 #include <string.h>
-#define PORT "9036" // Port we're listening on
+#define PORT "8080" // Port we're listening on
 #include "../LFP/LeaderFollower.hpp"
 
 // Declare the MST function as extern
